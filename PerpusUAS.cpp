@@ -554,10 +554,21 @@ void tampilkanBukuFisik() {
 }
 
 void tampilkanBukuOnline() {
+    const int ID_WIDTH = 5;
+    const int JUDUL_WIDTH = 25;
+    const int PENULIS_WIDTH = 20;
+    const int STATUS_WIDTH = 10;
+    const int KATEGORI_WIDTH = 15;
+    
     cout << "\n--- DAFTAR BUKU ONLINE ---" << endl;
-    printf("%-3s %-25s %-20s %-10s %-15s %s\n", 
-          "ID", "Judul", "Penulis", "Status", "Kategori", "URL/Link");
-    cout << "----------------------------------------------------------------------------------------" << endl;
+    printf("%-*s %-*s %-*s %-*s %-*s %s\n", 
+          ID_WIDTH, "ID",
+          JUDUL_WIDTH, "Judul",
+          PENULIS_WIDTH, "Penulis",
+          STATUS_WIDTH, "Status",
+          KATEGORI_WIDTH, "Kategori",
+          "URL/Link");
+    cout << string(90, '-') << endl;
     
     vector<Buku*> semuaBuku;
     indeksBuku.getDaftarBuku(semuaBuku);
@@ -565,32 +576,26 @@ void tampilkanBukuOnline() {
         if (buku->tipe == TipeBuku::ONLINE) {
             // Format judul
             string judul = buku->judul;
-            if (judul.length() > 25) {
-                judul = judul.substr(0, 22) + "...";
+            if (judul.length() > JUDUL_WIDTH) {
+                judul = judul.substr(0, JUDUL_WIDTH-3) + "...";
             }
             
             // Format penulis
             string penulis = buku->penulis;
-            if (penulis.length() > 20) {
-                penulis = penulis.substr(0, 17) + "...";
+            if (penulis.length() > PENULIS_WIDTH) {
+                penulis = penulis.substr(0, PENULIS_WIDTH-3) + "...";
             }
             
-            // Format URL
-            string url = buku->tempatBuku;
-            if (url.length() > 30) {
-                url = url.substr(0, 27) + "...";
-            }
-            
-            printf("%-3d %-25s %-20s %-10s %-15s %s\n", 
-                  buku->id,
-                  judul.c_str(),
-                  penulis.c_str(),
-                  (buku->dipinjam ? "Dipinjam" : "Tersedia"),
-                  kategoriToString(buku->kategori).c_str(),
-                  url.c_str());
+            printf("%-*d %-*s %-*s %-*s %-*s %s\n", 
+                  ID_WIDTH, buku->id,
+                  JUDUL_WIDTH, judul.c_str(),
+                  PENULIS_WIDTH, penulis.c_str(),
+                  STATUS_WIDTH, (buku->dipinjam ? "Dipinjam" : "Tersedia"),
+                  KATEGORI_WIDTH, kategoriToString(buku->kategori).c_str(),
+                  buku->tempatBuku.c_str());
         }
     }
-    cout << "----------------------------------------------------------------------------------------" << endl;
+    cout << string(90, '-') << endl;
 }
 
 void cekDetailBuku() {
