@@ -96,6 +96,10 @@ private:
 public:
     RiwayatPeminjaman() : head(nullptr) {}
     
+    // Mencegah shallow copy
+    RiwayatPeminjaman(const RiwayatPeminjaman&) = delete;
+    RiwayatPeminjaman& operator=(const RiwayatPeminjaman&) = delete;
+    
     void tambahRiwayat(int idBuku, int idPengguna, const string& judulBuku, 
                       const string& namaPengguna, const Waktu& waktuPinjam) {
         NodeRiwayat* nodeBaru = new NodeRiwayat();
@@ -175,6 +179,10 @@ private:
 public:
     AntrianPeminjaman() : front(nullptr), rear(nullptr), ukuran(0) {}
     
+    // Mencegah shallow copy
+    AntrianPeminjaman(const AntrianPeminjaman&) = delete;
+    AntrianPeminjaman& operator=(const AntrianPeminjaman&) = delete;
+    
     void enqueue(int idPengguna, int idBuku, const string& namaPengguna, const string& judulBuku) {
         NodeQueue* nodeBaru = new NodeQueue();
         nodeBaru->idPengguna = idPengguna;
@@ -193,22 +201,22 @@ public:
         cout << "Pengguna " << namaPengguna << " ditambahkan ke antrian untuk buku '" << judulBuku << "'" << endl;
     }
     
-    void dequeue() {
+    NodeQueue* dequeue() {
         if (front == nullptr) {
             cout << "Antrian kosong." << endl;
-            return;
+            return nullptr;
         }
         
         NodeQueue* temp = front;
-        cout << "Peminjaman untuk " << temp->namaPengguna << " (buku: " << temp->judulBuku << ") diproses." << endl;
         front = front->next;
         
         if (front == nullptr) {
             rear = nullptr;
         }
         
-        delete temp;
         ukuran--;
+        temp->next = nullptr; // Memutuskan hubungan sebelum return
+        return temp;
     }
     
     void tampilkanAntrian() {
@@ -232,7 +240,7 @@ public:
         cout << "---------------------------------------------------------------" << endl;
     }
     
-    bool kosong() {
+    bool kosong() const {
         return front == nullptr;
     }
     
@@ -252,6 +260,10 @@ struct NodeBST {
     NodeBST* kanan;
     
     NodeBST(Buku* b) : buku(b), kiri(nullptr), kanan(nullptr) {}
+    
+    ~NodeBST() {
+        // Tidak menghapus buku karena buku dimiliki oleh array daftarBuku
+    }
 };
 
 // Class Binary Search Tree
@@ -273,7 +285,7 @@ private:
         return node;
     }
     
-    NodeBST* cari(NodeBST* node, int id) {
+    NodeBST* cari(NodeBST* node, int id) const {
         if (node == nullptr || node->buku->id == id) {
             return node;
         }
@@ -285,7 +297,7 @@ private:
         return cari(node->kanan, id);
     }
     
-    void inorder(NodeBST* node, vector<Buku*>& hasil) {
+    void inorder(NodeBST* node, vector<Buku*>& hasil) const {
         if (node != nullptr) {
             inorder(node->kiri, hasil);
             hasil.push_back(node->buku);
@@ -293,22 +305,57 @@ private:
         }
     }
     
+    void hapusSemua(NodeBST* node) {
+        if (node != nullptr) {
+            hapusSemua(node->kiri);
+            hapusSemua(node->kanan);
+            delete node;
+        }
+    }
+    
 public:
     BST() : root(nullptr) {}
+    
+    // Copy constructor
+    BST(const BST& other) : root(nullptr) {
+        // Implementasi copy constructor jika diperlukan
+    }
+    
+    // Assignment operator
+    BST& operator=(const BST& other) {
+        if (this != &other) {
+            hapusSemua(root);
+            root = nullptr;
+            
+            vector<Buku*> bukuBuku;
+            other.getDaftarBuku(bukuBuku);
+            for (Buku* buku : bukuBuku) {
+                tambahBuku(buku);
+            }
+        }
+        return *this;
+    }
+    
+    ~BST() {
+        hapusSemua(root);
+    }
     
     void tambahBuku(Buku* buku) {
         root = insert(root, buku);
     }
     
-    Buku* cariBuku(int id) {
+    Buku* cariBuku(int id) const {
         NodeBST* node = cari(root, id);
         return node ? node->buku : nullptr;
     }
     
-    vector<Buku*> getDaftarBuku() {
-        vector<Buku*> hasil;
+    void getDaftarBuku(vector<Buku*>& hasil) const {
         inorder(root, hasil);
-        return hasil;
+    }
+    
+    void clear() {
+        hapusSemua(root);
+        root = nullptr;
     }
 };
 
@@ -331,7 +378,7 @@ void tampilkanBukuOnline();
 void cekDetailBuku();
 void pinjamBuku();
 void kembalikanBuku();
-void daftarPengguna();
+void daftarPenggunaBaru();
 void tampilkanSemuaPengguna();
 void tampilkanRiwayat();
 void tampilkanAntrian();
@@ -345,22 +392,104 @@ string tipeToString(TipeBuku tipe);
 
 // Implementasi Fungsi
 void initializeBuku() {
-    daftarBuku[0] = {1, "Mikroekonomi Dasar", "Robert S. Pindyck", KategoriBuku::EKONOMI, TipeBuku::FISIK, false, -1, "Rak A-1, Lantai 2"};
-    daftarBuku[1] = {2, "Algoritma dan Struktur Data", "Thomas H. Cormen", KategoriBuku::ILMU_KOMPUTER, TipeBuku::FISIK, false, -1, "Rak B-3, Lantai 1"};
-    daftarBuku[2] = {3, "Tafsir Al-Quran Al-Misbah", "M. Quraish Shihab", KategoriBuku::AGAMA, TipeBuku::FISIK, false, -1, "Rak C-2, Lantai 3"};
-    daftarBuku[3] = {4, "Sosiologi Modern", "Anthony Giddens", KategoriBuku::SOSIAL, TipeBuku::FISIK, false, -1, "Rak D-1, Lantai 2"};
-    daftarBuku[4] = {5, "Sistem Politik Indonesia", "Miriam Budiardjo", KategoriBuku::PEMERINTAHAN, TipeBuku::FISIK, false, -1, "Rak E-4, Lantai 1"};
-    daftarBuku[5] = {6, "Makroekonomi Global", "Paul Krugman", KategoriBuku::EKONOMI, TipeBuku::ONLINE, false, -1, "https://library.digital/macro-economics"};
-    daftarBuku[6] = {7, "Machine Learning Fundamentals", "Andrew Ng", KategoriBuku::ILMU_KOMPUTER, TipeBuku::ONLINE, false, -1, "https://library.digital/ml-fundamentals"};
-    daftarBuku[7] = {8, "Hadits Shahih Bukhari", "Imam Bukhari", KategoriBuku::AGAMA, TipeBuku::ONLINE, false, -1, "https://library.digital/bukhari-hadits"};
-    daftarBuku[8] = {9, "Psikologi Sosial", "David G. Myers", KategoriBuku::SOSIAL, TipeBuku::ONLINE, false, -1, "https://library.digital/social-psychology"};
-    daftarBuku[9] = {10, "Filsafat Kontemporer", "Bertrand Russell", KategoriBuku::FILSAFAT, TipeBuku::ONLINE, false, -1, "https://library.digital/contemporary-philosophy"};
+    // Inisialisasi buku fisik
+    daftarBuku[0].id = 1;
+    daftarBuku[0].judul = "Mikroekonomi Dasar";
+    daftarBuku[0].penulis = "Robert S. Pindyck";
+    daftarBuku[0].kategori = KategoriBuku::EKONOMI;
+    daftarBuku[0].tipe = TipeBuku::FISIK;
+    daftarBuku[0].dipinjam = false;
+    daftarBuku[0].idPenggunaPeminjam = -1;
+    daftarBuku[0].tempatBuku = "Rak A-1, Lantai 2";
+
+    daftarBuku[1].id = 2;
+    daftarBuku[1].judul = "Algoritma dan Struktur Data";
+    daftarBuku[1].penulis = "Thomas H. Cormen";
+    daftarBuku[1].kategori = KategoriBuku::ILMU_KOMPUTER;
+    daftarBuku[1].tipe = TipeBuku::FISIK;
+    daftarBuku[1].dipinjam = false;
+    daftarBuku[1].idPenggunaPeminjam = -1;
+    daftarBuku[1].tempatBuku = "Rak B-3, Lantai 1";
+
+    daftarBuku[2].id = 3;
+    daftarBuku[2].judul = "Tafsir Al-Quran Al-Misbah";
+    daftarBuku[2].penulis = "M. Quraish Shihab";
+    daftarBuku[2].kategori = KategoriBuku::AGAMA;
+    daftarBuku[2].tipe = TipeBuku::FISIK;
+    daftarBuku[2].dipinjam = false;
+    daftarBuku[2].idPenggunaPeminjam = -1;
+    daftarBuku[2].tempatBuku = "Rak C-2, Lantai 3";
+
+    daftarBuku[3].id = 4;
+    daftarBuku[3].judul = "Sosiologi Modern";
+    daftarBuku[3].penulis = "Anthony Giddens";
+    daftarBuku[3].kategori = KategoriBuku::SOSIAL;
+    daftarBuku[3].tipe = TipeBuku::FISIK;
+    daftarBuku[3].dipinjam = false;
+    daftarBuku[3].idPenggunaPeminjam = -1;
+    daftarBuku[3].tempatBuku = "Rak D-1, Lantai 2";
+
+    daftarBuku[4].id = 5;
+    daftarBuku[4].judul = "Sistem Politik Indonesia";
+    daftarBuku[4].penulis = "Miriam Budiardjo";
+    daftarBuku[4].kategori = KategoriBuku::PEMERINTAHAN;
+    daftarBuku[4].tipe = TipeBuku::FISIK;
+    daftarBuku[4].dipinjam = false;
+    daftarBuku[4].idPenggunaPeminjam = -1;
+    daftarBuku[4].tempatBuku = "Rak E-4, Lantai 1";
+
+    // Inisialisasi buku online
+    daftarBuku[5].id = 6;
+    daftarBuku[5].judul = "Makroekonomi Global";
+    daftarBuku[5].penulis = "Paul Krugman";
+    daftarBuku[5].kategori = KategoriBuku::EKONOMI;
+    daftarBuku[5].tipe = TipeBuku::ONLINE;
+    daftarBuku[5].dipinjam = false;
+    daftarBuku[5].idPenggunaPeminjam = -1;
+    daftarBuku[5].tempatBuku = "https://library.digital/macro-economics";
+
+    daftarBuku[6].id = 7;
+    daftarBuku[6].judul = "Machine Learning Fundamentals";
+    daftarBuku[6].penulis = "Andrew Ng";
+    daftarBuku[6].kategori = KategoriBuku::ILMU_KOMPUTER;
+    daftarBuku[6].tipe = TipeBuku::ONLINE;
+    daftarBuku[6].dipinjam = false;
+    daftarBuku[6].idPenggunaPeminjam = -1;
+    daftarBuku[6].tempatBuku = "https://library.digital/ml-fundamentals";
+
+    daftarBuku[7].id = 8;
+    daftarBuku[7].judul = "Hadits Shahih Bukhari";
+    daftarBuku[7].penulis = "Imam Bukhari";
+    daftarBuku[7].kategori = KategoriBuku::AGAMA;
+    daftarBuku[7].tipe = TipeBuku::ONLINE;
+    daftarBuku[7].dipinjam = false;
+    daftarBuku[7].idPenggunaPeminjam = -1;
+    daftarBuku[7].tempatBuku = "https://library.digital/bukhari-hadits";
+
+    daftarBuku[8].id = 9;
+    daftarBuku[8].judul = "Psikologi Sosial";
+    daftarBuku[8].penulis = "David G. Myers";
+    daftarBuku[8].kategori = KategoriBuku::SOSIAL;
+    daftarBuku[8].tipe = TipeBuku::ONLINE;
+    daftarBuku[8].dipinjam = false;
+    daftarBuku[8].idPenggunaPeminjam = -1;
+    daftarBuku[8].tempatBuku = "https://library.digital/social-psychology";
+
+    daftarBuku[9].id = 10;
+    daftarBuku[9].judul = "Filsafat Kontemporer";
+    daftarBuku[9].penulis = "Bertrand Russell";
+    daftarBuku[9].kategori = KategoriBuku::FILSAFAT;
+    daftarBuku[9].tipe = TipeBuku::ONLINE;
+    daftarBuku[9].dipinjam = false;
+    daftarBuku[9].idPenggunaPeminjam = -1;
+    daftarBuku[9].tempatBuku = "https://library.digital/contemporary-philosophy";
+
+    jumlahBuku = 10;
     
-    for (int i = 0; i < 10; i++) {
+    // Tambahkan semua buku ke indeks BST
+    for (int i = 0; i < jumlahBuku; i++) {
         indeksBuku.tambahBuku(&daftarBuku[i]);
     }
-    
-    jumlahBuku = 10;
 }
 
 void tampilkanMenu() {
@@ -386,12 +515,14 @@ void tampilkanBukuFisik() {
     cout << "ID\tJudul\t\t\t\tPenulis\t\t\tStatus\t\tKategori\t\tTempat Buku" << endl;
     cout << "--------------------------------------------------------------------------------------------------------------------" << endl;
     
-    for (int i = 0; i < jumlahBuku; i++) {
-        if (daftarBuku[i].tipe == TipeBuku::FISIK) {
-            cout << daftarBuku[i].id << "\t";
+    vector<Buku*> semuaBuku;
+    indeksBuku.getDaftarBuku(semuaBuku);
+    for (Buku* buku : semuaBuku) {
+        if (buku->tipe == TipeBuku::FISIK) {
+            cout << buku->id << "\t";
             
             // Format judul dengan padding yang tepat
-            string judul = daftarBuku[i].judul;
+            string judul = buku->judul;
             if (judul.length() > 23) {
                 judul = judul.substr(0, 20) + "...";
             }
@@ -399,7 +530,7 @@ void tampilkanBukuFisik() {
             for (int j = judul.length(); j < 24; j++) cout << " ";
             
             // Format penulis
-            string penulis = daftarBuku[i].penulis;
+            string penulis = buku->penulis;
             if (penulis.length() > 19) {
                 penulis = penulis.substr(0, 16) + "...";
             }
@@ -407,13 +538,13 @@ void tampilkanBukuFisik() {
             for (int j = penulis.length(); j < 20; j++) cout << " ";
             
             // Status buku
-            if (daftarBuku[i].dipinjam) {
+            if (buku->dipinjam) {
                 cout << "Dipinjam\t";
             } else {
                 cout << "Tersedia\t";
             }
             
-            cout << kategoriToString(daftarBuku[i].kategori) << "\t\t" << daftarBuku[i].tempatBuku << endl;
+            cout << kategoriToString(buku->kategori) << "\t\t" << buku->tempatBuku << endl;
         }
     }
     cout << "--------------------------------------------------------------------------------------------------------------------" << endl;
@@ -424,12 +555,14 @@ void tampilkanBukuOnline() {
     cout << "ID\tJudul\t\t\t\tPenulis\t\t\tStatus\t\tKategori\t\tURL/Link" << endl;
     cout << "--------------------------------------------------------------------------------------------------------------------" << endl;
     
-    for (int i = 0; i < jumlahBuku; i++) {
-        if (daftarBuku[i].tipe == TipeBuku::ONLINE) {
-            cout << daftarBuku[i].id << "\t";
+    vector<Buku*> semuaBuku;
+    indeksBuku.getDaftarBuku(semuaBuku);
+    for (Buku* buku : semuaBuku) {
+        if (buku->tipe == TipeBuku::ONLINE) {
+            cout << buku->id << "\t";
             
             // Format judul dengan padding yang tepat
-            string judul = daftarBuku[i].judul;
+            string judul = buku->judul;
             if (judul.length() > 23) {
                 judul = judul.substr(0, 20) + "...";
             }
@@ -437,7 +570,7 @@ void tampilkanBukuOnline() {
             for (int j = judul.length(); j < 24; j++) cout << " ";
             
             // Format penulis
-            string penulis = daftarBuku[i].penulis;
+            string penulis = buku->penulis;
             if (penulis.length() > 19) {
                 penulis = penulis.substr(0, 16) + "...";
             }
@@ -445,13 +578,13 @@ void tampilkanBukuOnline() {
             for (int j = penulis.length(); j < 20; j++) cout << " ";
             
             // Status buku
-            if (daftarBuku[i].dipinjam) {
+            if (buku->dipinjam) {
                 cout << "Dipinjam\t";
             } else {
                 cout << "Tersedia\t";
             }
             
-            cout << kategoriToString(daftarBuku[i].kategori) << "\t\t" << daftarBuku[i].tempatBuku << endl;
+            cout << kategoriToString(buku->kategori) << "\t\t" << buku->tempatBuku << endl;
         }
     }
     cout << "--------------------------------------------------------------------------------------------------------------------" << endl;
@@ -460,7 +593,11 @@ void tampilkanBukuOnline() {
 void cekDetailBuku() {
     int idBuku;
     cout << "Masukkan ID Buku: ";
-    cin >> idBuku;
+    if (!(cin >> idBuku)) {
+        cout << "Input tidak valid. Harap masukkan angka." << endl;
+        bersihkanBufferInput();
+        return;
+    }
     bersihkanBufferInput();
     
     Buku* buku = indeksBuku.cariBuku(idBuku);
@@ -494,9 +631,18 @@ void pinjamBuku() {
     
     int idBuku, idPengguna;
     cout << "Masukkan ID Buku: ";
-    cin >> idBuku;
+    if (!(cin >> idBuku)) {
+        cout << "Input ID Buku tidak valid." << endl;
+        bersihkanBufferInput();
+        return;
+    }
+    
     cout << "Masukkan ID Pengguna: ";
-    cin >> idPengguna;
+    if (!(cin >> idPengguna)) {
+        cout << "Input ID Pengguna tidak valid." << endl;
+        bersihkanBufferInput();
+        return;
+    }
     bersihkanBufferInput();
     
     Buku* buku = indeksBuku.cariBuku(idBuku);
@@ -529,7 +675,11 @@ void pinjamBuku() {
 void kembalikanBuku() {
     int idBuku;
     cout << "Masukkan ID Buku yang akan dikembalikan: ";
-    cin >> idBuku;
+    if (!(cin >> idBuku)) {
+        cout << "Input ID Buku tidak valid." << endl;
+        bersihkanBufferInput();
+        return;
+    }
     bersihkanBufferInput();
     
     Buku* buku = indeksBuku.cariBuku(idBuku);
@@ -553,13 +703,13 @@ void kembalikanBuku() {
     buku->dipinjam = false;
     buku->idPenggunaPeminjam = -1;
     
+    // Proses antrian jika ada yang menunggu
     if (!antrian.kosong()) {
-        cout << "Memproses antrian..." << endl;
-        antrian.dequeue();
+        prosesAntrian();
     }
 }
 
-void daftarPengguna() {
+void daftarPenggunaBaru() {
     if (jumlahPengguna >= MAKS_PENGGUNA) {
         cout << "Batas maksimum pengguna tercapai." << endl;
         return;
@@ -568,6 +718,11 @@ void daftarPengguna() {
     cout << "Masukkan nama pengguna: ";
     string nama;
     getline(cin, nama);
+    
+    if (nama.empty()) {
+        cout << "Nama pengguna tidak boleh kosong." << endl;
+        return;
+    }
     
     daftarPengguna[jumlahPengguna].idPengguna = idPenggunaBerikutnya++;
     daftarPengguna[jumlahPengguna].nama = nama;
@@ -603,11 +758,43 @@ void tampilkanAntrian() {
 }
 
 void prosesAntrian() {
-    if (!antrian.kosong()) {
-        antrian.dequeue();
-    } else {
+    if (antrian.kosong()) {
         cout << "Tidak ada antrian untuk diproses." << endl;
+        return;
     }
+
+    NodeQueue* antrianDepan = antrian.dequeue();
+    if (antrianDepan == nullptr) {
+        return;
+    }
+
+    Buku* buku = indeksBuku.cariBuku(antrianDepan->idBuku);
+    if (buku == nullptr) {
+        cout << "Buku tidak ditemukan." << endl;
+        delete antrianDepan;
+        return;
+    }
+
+    if (buku->dipinjam) {
+        // Buku masih dipinjam, masukkan kembali ke antrian
+        antrian.enqueue(antrianDepan->idPengguna, antrianDepan->idBuku, 
+                       antrianDepan->namaPengguna, antrianDepan->judulBuku);
+        cout << "Buku masih dipinjam. Pengguna " << antrianDepan->namaPengguna 
+             << " dikembalikan ke antrian." << endl;
+    } else {
+        // Buku tersedia, proses peminjaman
+        buku->dipinjam = true;
+        buku->idPenggunaPeminjam = antrianDepan->idPengguna;
+        buku->waktuPinjam.setWaktuSekarang();
+        
+        riwayat.tambahRiwayat(antrianDepan->idBuku, antrianDepan->idPengguna, 
+                             buku->judul, antrianDepan->namaPengguna, buku->waktuPinjam);
+        
+        cout << "Buku '" << buku->judul << "' berhasil dipinjam oleh " 
+             << antrianDepan->namaPengguna << " dari antrian." << endl;
+    }
+
+    delete antrianDepan;
 }
 
 void urutkanBuku() {
@@ -625,11 +812,10 @@ void urutkanBuku() {
     }
     
     // Rebuild BST setelah sorting
-    BST newBST;
+    indeksBuku.clear();
     for (int i = 0; i < jumlahBuku; i++) {
-        newBST.tambahBuku(&daftarBuku[i]);
+        indeksBuku.tambahBuku(&daftarBuku[i]);
     }
-    indeksBuku = newBST;
     
     cout << "Buku berhasil diurutkan berdasarkan judul secara alfabetis." << endl;
 }
@@ -639,6 +825,11 @@ void cariBuku() {
     cout << "Masukkan kata kunci pencarian (judul): ";
     getline(cin, keyword);
     
+    if (keyword.empty()) {
+        cout << "Kata kunci tidak boleh kosong." << endl;
+        return;
+    }
+    
     // Konversi ke lowercase dengan cara yang aman
     transform(keyword.begin(), keyword.end(), keyword.begin(), 
               [](unsigned char c) { return tolower(c); });
@@ -646,16 +837,18 @@ void cariBuku() {
     cout << "\n--- HASIL PENCARIAN ---" << endl;
     bool ditemukan = false;
     
-    for (int i = 0; i < jumlahBuku; i++) {
-        string judulLower = daftarBuku[i].judul;
+    vector<Buku*> semuaBuku;
+    indeksBuku.getDaftarBuku(semuaBuku);
+    for (Buku* buku : semuaBuku) {
+        string judulLower = buku->judul;
         // Konversi ke lowercase dengan cara yang aman
         transform(judulLower.begin(), judulLower.end(), judulLower.begin(),
                   [](unsigned char c) { return tolower(c); });
         
         if (judulLower.find(keyword) != string::npos) {
-            cout << "ID: " << daftarBuku[i].id << " | " 
-                 << daftarBuku[i].judul << " (" << tipeToString(daftarBuku[i].tipe) << ")" 
-                 << " - " << daftarBuku[i].penulis << endl;
+            cout << "ID: " << buku->id << " | " 
+                 << buku->judul << " (" << tipeToString(buku->tipe) << ")" 
+                 << " - " << buku->penulis << endl;
             ditemukan = true;
         }
     }
@@ -705,7 +898,11 @@ int main() {
     do {
         tampilkanMenu();
         cout << "Pilih menu: ";
-        cin >> pilihan;
+        if (!(cin >> pilihan)) {
+            cout << "Input tidak valid. Harap masukkan angka." << endl;
+            bersihkanBufferInput();
+            continue;
+        }
         bersihkanBufferInput();
         
         switch (pilihan) {
@@ -714,7 +911,7 @@ int main() {
             case 3: cekDetailBuku(); break;
             case 4: pinjamBuku(); break;
             case 5: kembalikanBuku(); break;
-            case 6: daftarPengguna(); break;
+            case 6: daftarPenggunaBaru(); break;
             case 7: tampilkanSemuaPengguna(); break;
             case 8: tampilkanRiwayat(); break;
             case 9: tampilkanAntrian(); break;
