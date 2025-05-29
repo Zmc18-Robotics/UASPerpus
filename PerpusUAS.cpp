@@ -512,82 +512,85 @@ void tampilkanMenu() {
 
 void tampilkanBukuFisik() {
     cout << "\n--- DAFTAR BUKU FISIK ---" << endl;
-    cout << "ID\tJudul\t\t\t\tPenulis\t\t\tStatus\t\tKategori\t\tTempat Buku" << endl;
-    cout << "--------------------------------------------------------------------------------------------------------------------" << endl;
+    cout << "ID   Judul                         Penulis                 Status        Kategori            Tempat Buku" << endl;
+    cout << "------------------------------------------------------------------------------------------------------" << endl;
     
     vector<Buku*> semuaBuku;
     indeksBuku.getDaftarBuku(semuaBuku);
     for (Buku* buku : semuaBuku) {
         if (buku->tipe == TipeBuku::FISIK) {
-            cout << buku->id << "\t";
+            // Format ID (4 karakter)
+            printf("%-4d", buku->id);
             
-            // Format judul dengan padding yang tepat
+            // Format judul (30 karakter)
             string judul = buku->judul;
-            if (judul.length() > 23) {
-                judul = judul.substr(0, 20) + "...";
+            if (judul.length() > 28) {
+                judul = judul.substr(0, 25) + "...";
             }
-            cout << judul;
-            for (int j = judul.length(); j < 24; j++) cout << " ";
+            printf("%-30s", judul.c_str());
             
-            // Format penulis
+            // Format penulis (25 karakter)
             string penulis = buku->penulis;
-            if (penulis.length() > 19) {
-                penulis = penulis.substr(0, 16) + "...";
+            if (penulis.length() > 23) {
+                penulis = penulis.substr(0, 20) + "...";
             }
-            cout << penulis;
-            for (int j = penulis.length(); j < 20; j++) cout << " ";
+            printf("%-25s", penulis.c_str());
             
-            // Status buku
-            if (buku->dipinjam) {
-                cout << "Dipinjam\t";
-            } else {
-                cout << "Tersedia\t";
-            }
+            // Format status (15 karakter)
+            string status = buku->dipinjam ? "Dipinjam" : "Tersedia";
+            printf("%-15s", status.c_str());
             
-            cout << kategoriToString(buku->kategori) << "\t\t" << buku->tempatBuku << endl;
+            // Format kategori (20 karakter)
+            string kategori = kategoriToString(buku->kategori);
+            printf("%-20s", kategori.c_str());
+            
+            // Tempat buku (tanpa batas)
+            cout << buku->tempatBuku;
+            
+            cout << endl;
         }
     }
-    cout << "--------------------------------------------------------------------------------------------------------------------" << endl;
+    cout << "------------------------------------------------------------------------------------------------------" << endl;
 }
 
 void tampilkanBukuOnline() {
     cout << "\n--- DAFTAR BUKU ONLINE ---" << endl;
-    cout << "ID\tJudul\t\t\t\tPenulis\t\t\tStatus\t\tKategori\t\tURL/Link" << endl;
-    cout << "--------------------------------------------------------------------------------------------------------------------" << endl;
+    printf("%-3s %-25s %-20s %-10s %-15s %s\n", 
+          "ID", "Judul", "Penulis", "Status", "Kategori", "URL/Link");
+    cout << "----------------------------------------------------------------------------------------" << endl;
     
     vector<Buku*> semuaBuku;
     indeksBuku.getDaftarBuku(semuaBuku);
     for (Buku* buku : semuaBuku) {
         if (buku->tipe == TipeBuku::ONLINE) {
-            cout << buku->id << "\t";
-            
-            // Format judul dengan padding yang tepat
+            // Format judul
             string judul = buku->judul;
-            if (judul.length() > 23) {
-                judul = judul.substr(0, 20) + "...";
+            if (judul.length() > 25) {
+                judul = judul.substr(0, 22) + "...";
             }
-            cout << judul;
-            for (int j = judul.length(); j < 24; j++) cout << " ";
             
             // Format penulis
             string penulis = buku->penulis;
-            if (penulis.length() > 19) {
-                penulis = penulis.substr(0, 16) + "...";
-            }
-            cout << penulis;
-            for (int j = penulis.length(); j < 20; j++) cout << " ";
-            
-            // Status buku
-            if (buku->dipinjam) {
-                cout << "Dipinjam\t";
-            } else {
-                cout << "Tersedia\t";
+            if (penulis.length() > 20) {
+                penulis = penulis.substr(0, 17) + "...";
             }
             
-            cout << kategoriToString(buku->kategori) << "\t\t" << buku->tempatBuku << endl;
+            // Format URL
+            string url = buku->tempatBuku;
+            if (url.length() > 30) {
+                url = url.substr(0, 27) + "...";
+            }
+            
+            printf("%-3d %-25s %-20s %-10s %-15s %s\n", 
+                  buku->id,
+                  judul.c_str(),
+                  penulis.c_str(),
+                  (buku->dipinjam ? "Dipinjam" : "Tersedia"),
+                  kategoriToString(buku->kategori).c_str(),
+                  url.c_str());
         }
     }
-    cout << "--------------------------------------------------------------------------------------------------------------------" << endl;
+    cout << "----------------------------------------------------------------------------------------" << endl;
 }
 
 void cekDetailBuku() {
