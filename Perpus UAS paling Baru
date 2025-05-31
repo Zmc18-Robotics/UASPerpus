@@ -1,0 +1,1270 @@
+#include <iostream>
+#include <ctime>
+#include <vector>
+#include <limits>
+#include <string>
+#include <algorithm>
+#include <iomanip>
+
+using namespace std;
+
+// Constants
+const int MAKS_BUKU = 100;
+const int MAKS_PENGGUNA = 50;
+
+// Book Category Enum
+enum class KategoriBuku {
+    EKONOMI,
+    ILMU_KOMPUTER,
+    AGAMA,
+    SOSIAL,
+    PEMERINTAHAN,
+    FILSAFAT,
+    LAIN_LAIN
+};
+
+// Book Type Enum
+enum class TipeBuku {
+    FISIK,
+    ONLINE
+};
+
+// Time Structure
+struct Waktu {
+    int hari, bulan, tahun;
+    int jam, menit;
+    
+    Waktu() : hari(0), bulan(0), tahun(0), jam(0), menit(0) {}
+    
+    void setWaktuSekarang() {
+        time_t sekarang = time(0);
+        tm* waktuLokal = localtime(&sekarang);
+        hari = waktuLokal->tm_mday;
+        bulan = waktuLokal->tm_mon + 1;
+        tahun = waktuLokal->tm_year + 1900;
+        jam = waktuLokal->tm_hour;
+        menit = waktuLokal->tm_min;
+    }
+    
+    void tambahMinggu() {
+        tm tmStruct = {0};
+        tmStruct.tm_mday = hari;
+        tmStruct.tm_mon = bulan - 1;
+        tmStruct.tm_year = tahun - 1900;
+        tmStruct.tm_hour = jam;
+        tmStruct.tm_min = menit;
+        
+        time_t waktu = mktime(&tmStruct);
+        waktu += 7 * 24 * 60 * 60;
+        
+        tm* waktuBaru = localtime(&waktu);
+        hari = waktuBaru->tm_mday;
+        bulan = waktuBaru->tm_mon + 1;
+        tahun = waktuBaru->tm_year + 1900;
+        jam = waktuBaru->tm_hour;
+        menit = waktuBaru->tm_min;
+    }
+    
+    bool sudahLewatWaktu() const {
+        time_t sekarang = time(0);
+        tm* waktuLokal = localtime(&sekarang);
+        
+        tm tmDeadline = {0};
+        tmDeadline.tm_mday = hari;
+        tmDeadline.tm_mon = bulan - 1;
+        tmDeadline.tm_year = tahun - 1900;
+        tmDeadline.tm_hour = jam;
+        tmDeadline.tm_min = menit;
+        
+        time_t deadline = mktime(&tmDeadline);
+        
+        return difftime(sekarang, deadline) > 0;
+    }
+    
+    string toString() const {
+        return to_string(hari) + "/" + to_string(bulan) + "/" + to_string(tahun) + 
+               " " + to_string(jam) + ":" + (menit < 10 ? "0" : "") + to_string(menit);
+    }
+};
+
+// Book Structure
+struct Buku {
+    int id;
+    string judul;
+    string penulis;
+    KategoriBuku kategori;
+    TipeBuku tipe;
+    bool dipinjam;
+    int idPenggunaPeminjam;
+    string tempatBuku;
+    Waktu waktuPinjam;
+    Waktu deadlinePengembalian;
+    
+    Buku() : id(0), judul(""), penulis(""), kategori(KategoriBuku::LAIN_LAIN), 
+             tipe(TipeBuku::FISIK), dipinjam(false), idPenggunaPeminjam(-1), tempatBuku("") {}
+};
+
+// User Structure
+struct Pengguna {
+    int idPengguna;
+    string nama;
+    string username;
+    string password;
+    
+    Pengguna() : idPengguna(0), nama(""), username(""), password("") {}
+};
+
+// History Node for Linked List
+struct NodeRiwayat {
+    int idBuku;
+    int idPengguna;
+    string judulBuku;
+    string namaPengguna;
+    Waktu waktuPinjam;
+    Waktu waktuKembali;
+    Waktu deadlinePengembalian;
+    NodeRiwayat* next;
+    
+    NodeRiwayat() : idBuku(0), idPengguna(0), judulBuku(""), namaPengguna(""), next(nullptr) {}
+};
+
+// Borrowing History Class
+class RiwayatPeminjaman {
+private:
+    NodeRiwayat* head;
+    
+public:
+    RiwayatPeminjaman() : head(nullptr) {}
+    
+    RiwayatPeminjaman(const RiwayatPeminjaman&) = delete;
+    RiwayatPeminjaman& operator=(const RiwayatPeminjaman&) = delete;
+    
+    void tambahRiwayat(int idBuku, int idPengguna, const string& judulBuku, 
+                      const string& namaPengguna, const Waktu& waktuPinjam,
+                      const Waktu& deadline) {
+        NodeRiwayat* nodeBaru = new NodeRiwayat();
+        nodeBaru->idBuku = idBuku;
+        nodeBaru->idPengguna = idPengguna;
+        nodeBaru->judulBuku = judulBuku;
+        nodeBaru->namaPengguna = namaPengguna;
+        nodeBaru->waktuPinjam = waktuPinjam;
+        nodeBaru->deadlinePengembalian = deadline;
+        nodeBaru->next = head;
+        head = nodeBaru;
+    }
+    
+    void selesaiPeminjaman(int idBuku, const Waktu& waktuKembali) {
+        NodeRiwayat* current = head;
+        while (current != nullptr) {
+            if (current->idBuku == idBuku && current->waktuKembali.hari == 0) {
+                current->waktuKembali = waktuKembali;
+                break;
+            }
+            current = current->next;
+        }
+    }
+    
+    void tampilkanRiwayat() {
+        if (head == nullptr) {
+            cout << "Tidak ada riwayat peminjaman." << endl;
+            return;
+        }
+        
+        cout << "\n--- Riwayat Peminjaman ---" << endl;
+        cout << "ID Buku\tJudul\t\tPeminjam\tWaktu Pinjam\t\tDeadline\t\tWaktu Kembali" << endl;
+        cout << "------------------------------------------------------------------------------------------------" << endl;
+        
+        NodeRiwayat* current = head;
+        while (current != nullptr) {
+            cout << current->idBuku << "\t" 
+                 << (current->judulBuku.length() > 15 ? 
+                    current->judulBuku.substr(0, 12) + "..." : current->judulBuku) << "\t"
+                 << (current->namaPengguna.length() > 10 ? 
+                    current->namaPengguna.substr(0, 7) + "..." : current->namaPengguna) << "\t"
+                 << current->waktuPinjam.toString() << "\t"
+                 << current->deadlinePengembalian.toString() << "\t";
+            if (current->waktuKembali.hari != 0) {
+                cout << current->waktuKembali.toString();
+            } else {
+                cout << "Belum dikembalikan";
+            }
+            cout << endl;
+            current = current->next;
+        }
+        cout << "------------------------------------------------------------------------------------------------" << endl;
+    }
+    
+    void tampilkanRiwayatPengguna(int idPengguna) {
+        NodeRiwayat* current = head;
+        bool ditemukan = false;
+        
+        cout << "\n--- Riwayat Peminjaman Anda ---" << endl;
+        cout << "ID Buku\tJudul\t\tWaktu Pinjam\t\tDeadline\t\tWaktu Kembali" << endl;
+        cout << "--------------------------------------------------------------------------------" << endl;
+        
+        while (current != nullptr) {
+            if (current->idPengguna == idPengguna) {
+                ditemukan = true;
+                cout << current->idBuku << "\t" 
+                     << (current->judulBuku.length() > 15 ? 
+                        current->judulBuku.substr(0, 12) + "..." : current->judulBuku) << "\t"
+                     << current->waktuPinjam.toString() << "\t"
+                     << current->deadlinePengembalian.toString() << "\t";
+                if (current->waktuKembali.hari != 0) {
+                    cout << current->waktuKembali.toString();
+                } else {
+                    cout << "Belum dikembalikan";
+                    if (current->deadlinePengembalian.sudahLewatWaktu()) {
+                        cout << " (TERLAMBAT)";
+                    }
+                }
+                cout << endl;
+            }
+            current = current->next;
+        }
+        
+        if (!ditemukan) {
+            cout << "Anda belum pernah meminjam buku." << endl;
+        }
+        cout << "--------------------------------------------------------------------------------" << endl;
+    }
+    
+    NodeRiwayat* getHead() const {
+        return head;
+    }
+    
+    ~RiwayatPeminjaman() {
+        while (head != nullptr) {
+            NodeRiwayat* temp = head;
+            head = head->next;
+            delete temp;
+        }
+    }
+};
+
+// Queue Node for Waiting List
+struct NodeQueue {
+    int idPengguna;
+    int idBuku;
+    string namaPengguna;
+    string judulBuku;
+    Waktu waktuAntri;
+    NodeQueue* next;
+    
+    NodeQueue() : idPengguna(0), idBuku(0), namaPengguna(""), judulBuku(""), next(nullptr) {}
+};
+
+// Waiting Queue Class
+class AntrianPeminjaman {
+private:
+    NodeQueue* front;
+    NodeQueue* rear;
+    int ukuran;
+    
+public:
+    AntrianPeminjaman() : front(nullptr), rear(nullptr), ukuran(0) {}
+    
+    AntrianPeminjaman(const AntrianPeminjaman&) = delete;
+    AntrianPeminjaman& operator=(const AntrianPeminjaman&) = delete;
+    
+    void enqueue(int idPengguna, int idBuku, const string& namaPengguna, const string& judulBuku) {
+        NodeQueue* nodeBaru = new NodeQueue();
+        nodeBaru->idPengguna = idPengguna;
+        nodeBaru->idBuku = idBuku;
+        nodeBaru->namaPengguna = namaPengguna;
+        nodeBaru->judulBuku = judulBuku;
+        nodeBaru->waktuAntri.setWaktuSekarang();
+        
+        if (rear == nullptr) {
+            front = rear = nodeBaru;
+        } else {
+            rear->next = nodeBaru;
+            rear = nodeBaru;
+        }
+        ukuran++;
+        cout << "Pengguna " << namaPengguna << " ditambahkan ke antrian untuk buku '" << judulBuku << "'" << endl;
+    }
+    
+    NodeQueue* dequeue() {
+        if (front == nullptr) {
+            cout << "Antrian kosong." << endl;
+            return nullptr;
+        }
+        
+        NodeQueue* temp = front;
+        front = front->next;
+        
+        if (front == nullptr) {
+            rear = nullptr;
+        }
+        
+        ukuran--;
+        temp->next = nullptr;
+        return temp;
+    }
+    
+    void tampilkanAntrian() {
+        if (front == nullptr) {
+            cout << "Antrian peminjaman kosong." << endl;
+            return;
+        }
+        
+        cout << "\n--- Antrian Peminjaman ---" << endl;
+        cout << "Posisi\tNama Pengguna\tJudul Buku\t\tWaktu Antri" << endl;
+        cout << "---------------------------------------------------------------" << endl;
+        
+        NodeQueue* current = front;
+        int posisi = 1;
+        while (current != nullptr) {
+            cout << posisi << "\t" << current->namaPengguna << "\t\t" 
+                 << current->judulBuku << "\t\t" << current->waktuAntri.toString() << endl;
+            current = current->next;
+            posisi++;
+        }
+        cout << "---------------------------------------------------------------" << endl;
+    }
+    
+    bool kosong() const {
+        return front == nullptr;
+    }
+    
+    ~AntrianPeminjaman() {
+        while (front != nullptr) {
+            NodeQueue* temp = front;
+            front = front->next;
+            delete temp;
+        }
+    }
+};
+
+// BST Node for Book Indexing
+struct NodeBST {
+    Buku* buku;
+    NodeBST* kiri;
+    NodeBST* kanan;
+    
+    NodeBST(Buku* b) : buku(b), kiri(nullptr), kanan(nullptr) {}
+    
+    ~NodeBST() {
+        // Don't delete buku as it's owned by daftarBuku array
+    }
+};
+
+// Binary Search Tree Class
+class BST {
+private:
+    NodeBST* root;
+    
+    NodeBST* insert(NodeBST* node, Buku* buku) {
+        if (node == nullptr) {
+            return new NodeBST(buku);
+        }
+        
+        if (buku->id < node->buku->id) {
+            node->kiri = insert(node->kiri, buku);
+        } else if (buku->id > node->buku->id) {
+            node->kanan = insert(node->kanan, buku);
+        }
+        
+        return node;
+    }
+    
+    NodeBST* cari(NodeBST* node, int id) const {
+        if (node == nullptr || node->buku->id == id) {
+            return node;
+        }
+        
+        if (id < node->buku->id) {
+            return cari(node->kiri, id);
+        }
+        
+        return cari(node->kanan, id);
+    }
+    
+    void inorder(NodeBST* node, vector<Buku*>& hasil) const {
+        if (node != nullptr) {
+            inorder(node->kiri, hasil);
+            hasil.push_back(node->buku);
+            inorder(node->kanan, hasil);
+        }
+    }
+    
+    void hapusSemua(NodeBST* node) {
+        if (node != nullptr) {
+            hapusSemua(node->kiri);
+            hapusSemua(node->kanan);
+            delete node;
+        }
+    }
+    
+public:
+    BST() : root(nullptr) {}
+    
+    BST(const BST& other) : root(nullptr) {
+        vector<Buku*> bukuBuku;
+        other.getDaftarBuku(bukuBuku);
+        for (Buku* buku : bukuBuku) {
+            tambahBuku(buku);
+        }
+    }
+    
+    BST& operator=(const BST& other) {
+        if (this != &other) {
+            hapusSemua(root);
+            root = nullptr;
+            
+            vector<Buku*> bukuBuku;
+            other.getDaftarBuku(bukuBuku);
+            for (Buku* buku : bukuBuku) {
+                tambahBuku(buku);
+            }
+        }
+        return *this;
+    }
+    
+    ~BST() {
+        hapusSemua(root);
+    }
+    
+    void tambahBuku(Buku* buku) {
+        root = insert(root, buku);
+    }
+    
+    Buku* cariBuku(int id) const {
+        NodeBST* node = cari(root, id);
+        return node ? node->buku : nullptr;
+    }
+    
+    void getDaftarBuku(vector<Buku*>& hasil) const {
+        inorder(root, hasil);
+    }
+    
+    void clear() {
+        hapusSemua(root);
+        root = nullptr;
+    }
+};
+
+// Global Variables
+Buku daftarBuku[MAKS_BUKU];
+Pengguna daftarPengguna[MAKS_PENGGUNA];
+int jumlahBuku = 0;
+int jumlahPengguna = 0;
+int idPenggunaBerikutnya = 1;
+int penggunaLoginId = -1;
+
+BST indeksBuku;
+RiwayatPeminjaman riwayat;
+AntrianPeminjaman antrian;
+
+// Function Declarations
+void initializeBuku();
+void initializePengguna();
+void tampilkanMenuLogin();
+void tampilkanMenuUtama();
+void tampilkanMenuBukuFisik();
+void tampilkanMenuBukuOnline();
+void login();
+void daftarAkun();
+void tampilkanSemuaBukuFisik();
+void tampilkanSemuaBukuOnline();
+void pinjamBuku(TipeBuku tipe);
+void kembalikanBuku(TipeBuku tipe);
+void tampilkanRiwayatPeminjaman(TipeBuku tipe);
+void tampilkanSemuaPengguna();
+void prosesAntrian();
+void urutkanBuku();
+void cariBuku(TipeBuku tipe);
+int cariIndeksPenggunaBerdasarkanId(int idPengguna);
+void bersihkanBufferInput();
+string kategoriToString(KategoriBuku kategori);
+string tipeToString(TipeBuku tipe);
+
+// Function Implementations
+void initializeBuku() {
+    // Physical books
+    daftarBuku[0].id = 1;
+    daftarBuku[0].judul = "Mikroekonomi Dasar";
+    daftarBuku[0].penulis = "Robert S. Pindyck";
+    daftarBuku[0].kategori = KategoriBuku::EKONOMI;
+    daftarBuku[0].tipe = TipeBuku::FISIK;
+    daftarBuku[0].dipinjam = false;
+    daftarBuku[0].idPenggunaPeminjam = -1;
+    daftarBuku[0].tempatBuku = "Rak A-1, Lantai 2";
+
+    // Physical book borrowed by user1 (ID 1)
+    daftarBuku[1].id = 2;
+    daftarBuku[1].judul = "Algoritma dan Struktur Data";
+    daftarBuku[1].penulis = "Thomas H. Cormen";
+    daftarBuku[1].kategori = KategoriBuku::ILMU_KOMPUTER;
+    daftarBuku[1].tipe = TipeBuku::FISIK;
+    daftarBuku[1].dipinjam = true;
+    daftarBuku[1].idPenggunaPeminjam = 1; // Borrowed by user1
+    daftarBuku[1].tempatBuku = "Rak B-3, Lantai 1";
+    daftarBuku[1].waktuPinjam.setWaktuSekarang();
+    daftarBuku[1].deadlinePengembalian = daftarBuku[1].waktuPinjam;
+    daftarBuku[1].deadlinePengembalian.tambahMinggu();
+
+    daftarBuku[2].id = 3;
+    daftarBuku[2].judul = "Tafsir Al-Quran Al-Misbah";
+    daftarBuku[2].penulis = "M. Quraish Shihab";
+    daftarBuku[2].kategori = KategoriBuku::AGAMA;
+    daftarBuku[2].tipe = TipeBuku::FISIK;
+    daftarBuku[2].dipinjam = false;
+    daftarBuku[2].idPenggunaPeminjam = -1;
+    daftarBuku[2].tempatBuku = "Rak C-2, Lantai 3";
+
+    // Physical book borrowed by user2 (ID 2)
+    daftarBuku[3].id = 4;
+    daftarBuku[3].judul = "Sosiologi Modern";
+    daftarBuku[3].penulis = "Anthony Giddens";
+    daftarBuku[3].kategori = KategoriBuku::SOSIAL;
+    daftarBuku[3].tipe = TipeBuku::FISIK;
+    daftarBuku[3].dipinjam = true;
+    daftarBuku[3].idPenggunaPeminjam = 2; // Borrowed by user2
+    daftarBuku[3].tempatBuku = "Rak D-1, Lantai 2";
+    daftarBuku[3].waktuPinjam.setWaktuSekarang();
+    daftarBuku[3].deadlinePengembalian = daftarBuku[3].waktuPinjam;
+    daftarBuku[3].deadlinePengembalian.tambahMinggu();
+
+    daftarBuku[4].id = 5;
+    daftarBuku[4].judul = "Sistem Politik Indonesia";
+    daftarBuku[4].penulis = "Miriam Budiardjo";
+    daftarBuku[4].kategori = KategoriBuku::PEMERINTAHAN;
+    daftarBuku[4].tipe = TipeBuku::FISIK;
+    daftarBuku[4].dipinjam = false;
+    daftarBuku[4].idPenggunaPeminjam = -1;
+    daftarBuku[4].tempatBuku = "Rak E-4, Lantai 1";
+
+    // Online books
+    // Online book borrowed by user1 (ID 1)
+    daftarBuku[5].id = 6;
+    daftarBuku[5].judul = "Makroekonomi Global";
+    daftarBuku[5].penulis = "Paul Krugman";
+    daftarBuku[5].kategori = KategoriBuku::EKONOMI;
+    daftarBuku[5].tipe = TipeBuku::ONLINE;
+    daftarBuku[5].dipinjam = true;
+    daftarBuku[5].idPenggunaPeminjam = 1; // Borrowed by user1
+    daftarBuku[5].tempatBuku = "https://library.digital/macro-economics";
+    daftarBuku[5].waktuPinjam.setWaktuSekarang();
+    daftarBuku[5].deadlinePengembalian = daftarBuku[5].waktuPinjam;
+    daftarBuku[5].deadlinePengembalian.tambahMinggu();
+
+    daftarBuku[6].id = 7;
+    daftarBuku[6].judul = "Machine Learning Fundamentals";
+    daftarBuku[6].penulis = "Andrew Ng";
+    daftarBuku[6].kategori = KategoriBuku::ILMU_KOMPUTER;
+    daftarBuku[6].tipe = TipeBuku::ONLINE;
+    daftarBuku[6].dipinjam = false;
+    daftarBuku[6].idPenggunaPeminjam = -1;
+    daftarBuku[6].tempatBuku = "https://library.digital/ml-fundamentals";
+
+    daftarBuku[7].id = 8;
+    daftarBuku[7].judul = "Hadits Shahih Bukhari";
+    daftarBuku[7].penulis = "Imam Bukhari";
+    daftarBuku[7].kategori = KategoriBuku::AGAMA;
+    daftarBuku[7].tipe = TipeBuku::ONLINE;
+    daftarBuku[7].dipinjam = false;
+    daftarBuku[7].idPenggunaPeminjam = -1;
+    daftarBuku[7].tempatBuku = "https://library.digital/bukhari-hadits";
+
+    daftarBuku[8].id = 9;
+    daftarBuku[8].judul = "Psikologi Sosial";
+    daftarBuku[8].penulis = "David G. Myers";
+    daftarBuku[8].kategori = KategoriBuku::SOSIAL;
+    daftarBuku[8].tipe = TipeBuku::ONLINE;
+    daftarBuku[8].dipinjam = false;
+    daftarBuku[8].idPenggunaPeminjam = -1;
+    daftarBuku[8].tempatBuku = "https://library.digital/social-psychology";
+
+    // Online book borrowed by user2 (ID 2)
+    daftarBuku[9].id = 10;
+    daftarBuku[9].judul = "Filsafat Kontemporer";
+    daftarBuku[9].penulis = "Bertrand Russell";
+    daftarBuku[9].kategori = KategoriBuku::FILSAFAT;
+    daftarBuku[9].tipe = TipeBuku::ONLINE;
+    daftarBuku[9].dipinjam = true;
+    daftarBuku[9].idPenggunaPeminjam = 2; // Borrowed by user2
+    daftarBuku[9].tempatBuku = "https://library.digital/contemporary-philosophy";
+    daftarBuku[9].waktuPinjam.setWaktuSekarang();
+    daftarBuku[9].deadlinePengembalian = daftarBuku[9].waktuPinjam;
+    daftarBuku[9].deadlinePengembalian.tambahMinggu();
+
+    jumlahBuku = 10;
+    
+    // Add all books to BST index and sync history
+    for (int i = 0; i < jumlahBuku; i++) {
+        indeksBuku.tambahBuku(&daftarBuku[i]);
+        
+        // Add history for borrowed books
+        if (daftarBuku[i].dipinjam) {
+            int idxPengguna = cariIndeksPenggunaBerdasarkanId(daftarBuku[i].idPenggunaPeminjam);
+            if (idxPengguna != -1) {
+                riwayat.tambahRiwayat(
+                    daftarBuku[i].id, 
+                    daftarBuku[i].idPenggunaPeminjam,
+                    daftarBuku[i].judul,
+                    daftarPengguna[idxPengguna].nama,
+                    daftarBuku[i].waktuPinjam,
+                    daftarBuku[i].deadlinePengembalian
+                );
+            }
+        }
+    }
+}
+
+void initializePengguna() {
+    // Regular user 1 (has borrowed books)
+    daftarPengguna[0].idPengguna = 1;
+    daftarPengguna[0].nama = "Cakramukti";
+    daftarPengguna[0].username = "Cakruy";
+    daftarPengguna[0].password = "pw1";
+    
+    // Regular user 2 (has borrowed books)
+    daftarPengguna[1].idPengguna = 2;
+    daftarPengguna[1].nama = "Muhammad ZIdane";
+    daftarPengguna[1].username = "armidac";
+    daftarPengguna[1].password = "pw2";
+    
+    // Regular user 3 (hasn't borrowed any books)
+    daftarPengguna[2].idPengguna = 3;
+    daftarPengguna[2].nama = "Arief Wicaksono";
+    daftarPengguna[2].username = "Arief";
+    daftarPengguna[2].password = "pw3";
+    
+    jumlahPengguna = 3;
+    idPenggunaBerikutnya = 4;
+}
+
+void tampilkanMenuLogin() {
+    cout << "\n=== SELAMAT DATANG DI PERPUSTAKAAN DIGITAL ===" << endl;
+    cout << "1. Login" << endl;
+    cout << "2. Daftar Akun Baru" << endl;
+    cout << "0. Keluar" << endl;
+    cout << "=============================================" << endl;
+}
+
+void tampilkanMenuUtama() {
+    cout << "\n=== MENU UTAMA ===" << endl;
+    cout << "1. Informasi Buku Fisik" << endl;
+    cout << "2. Informasi Buku Online" << endl;
+    cout << "3. Lihat Riwayat Peminjaman Saya" << endl;
+    cout << "0. Logout" << endl;
+    cout << "==================" << endl;
+}
+
+void tampilkanMenuBukuFisik() {
+    cout << "\n=== MENU BUKU FISIK ===" << endl;
+    cout << "1. Tampilkan Semua Buku Fisik" << endl;
+    cout << "2. Pinjam Buku Fisik" << endl;
+    cout << "3. Kembalikan Buku Fisik" << endl;
+    cout << "4. Riwayat Peminjaman Buku Fisik" << endl;
+    cout << "5. Cari Buku Fisik" << endl;
+    cout << "0. Kembali ke Menu Utama" << endl;
+    cout << "=======================" << endl;
+}
+
+void tampilkanMenuBukuOnline() {
+    cout << "\n=== MENU BUKU ONLINE ===" << endl;
+    cout << "1. Tampilkan Semua Buku Online" << endl;
+    cout << "2. Pinjam Buku Online" << endl;
+    cout << "3. Kembalikan Buku Online" << endl;
+    cout << "4. Riwayat Peminjaman Buku Online" << endl;
+    cout << "5. Cari Buku Online" << endl;
+    cout << "0. Kembali ke Menu Utama" << endl;
+    cout << "========================" << endl;
+}
+
+void login() {
+    string username, password;
+    cout << "Username: ";
+    getline(cin, username);
+    cout << "Password: ";
+    getline(cin, password);
+    
+    for (int i = 0; i < jumlahPengguna; i++) {
+        if (daftarPengguna[i].username == username && daftarPengguna[i].password == password) {
+            penggunaLoginId = daftarPengguna[i].idPengguna;
+            
+            cout << "\nLogin berhasil! Selamat datang, " << daftarPengguna[i].nama << "!" << endl;
+            return;
+        }
+    }
+    
+    cout << "Username atau password salah. Silakan coba lagi." << endl;
+}
+
+void daftarAkun() {
+    if (jumlahPengguna >= MAKS_PENGGUNA) {
+        cout << "Batas maksimum pengguna tercapai." << endl;
+        return;
+    }
+    
+    string nama, username, password;
+    cout << "Nama Lengkap: ";
+    getline(cin, nama);
+    cout << "Username: ";
+    getline(cin, username);
+    cout << "Password: ";
+    getline(cin, password);
+    
+    if (nama.empty() || username.empty() || password.empty()) {
+        cout << "Semua field harus diisi." << endl;
+        return;
+    }
+    
+    // Check if username already exists
+    for (int i = 0; i < jumlahPengguna; i++) {
+        if (daftarPengguna[i].username == username) {
+            cout << "Username sudah digunakan. Silakan pilih username lain." << endl;
+            return;
+        }
+    }
+    
+    daftarPengguna[jumlahPengguna].idPengguna = idPenggunaBerikutnya++;
+    daftarPengguna[jumlahPengguna].nama = nama;
+    daftarPengguna[jumlahPengguna].username = username;
+    daftarPengguna[jumlahPengguna].password = password;
+    
+    cout << "\nPendaftaran berhasil! Akun Anda telah dibuat dengan ID: " 
+         << daftarPengguna[jumlahPengguna].idPengguna << endl;
+    
+    jumlahPengguna++;
+}
+
+void tampilkanSemuaBukuFisik() {
+    cout << "\n--- DAFTAR BUKU FISIK ---" << endl;
+    cout << "ID   Judul                         Penulis                 Status        Kategori            Tempat Buku" << endl;
+    cout << "------------------------------------------------------------------------------------------------------" << endl;
+
+    vector<Buku*> semuaBuku;
+    indeksBuku.getDaftarBuku(semuaBuku);
+    for (Buku* buku : semuaBuku) {
+        if (buku->tipe == TipeBuku::FISIK) {
+            // Cetak ID
+            cout << buku->id << " ";
+
+            // Cetak Judul tanpa lebarnya
+            cout << buku->judul << " ";
+
+            // Cetak Penulis tanpa lebarnya
+            cout << buku->penulis << " ";
+
+            // Cetak Status
+            cout << (buku->dipinjam ? "Dipinjam" : "Tersedia") << " ";
+
+            // Cetak Kategori
+            cout << kategoriToString(buku->kategori) << " ";
+
+            // Cetak Tempat Buku
+            cout << buku->tempatBuku;
+
+            // Jika buku dipinjam, tampilkan info peminjam
+            if (buku->dipinjam) {
+                int idxPengguna = cariIndeksPenggunaBerdasarkanId(buku->idPenggunaPeminjam);
+                if (idxPengguna != -1) {
+                    cout << "\n\tPeminjam: " << daftarPengguna[idxPengguna].nama 
+                         << " (ID: " << buku->idPenggunaPeminjam << ")";
+                    cout << "\n\tWaktu Pinjam: " << buku->waktuPinjam.toString();
+                    cout << "\n\tDeadline: " << buku->deadlinePengembalian.toString();
+                    if (buku->deadlinePengembalian.sudahLewatWaktu()) {
+                        cout << " (TERLAMBAT)";
+                    }
+                }
+            }
+            cout << endl;
+        }
+    }
+    cout << "------------------------------------------------------------------------------------------------------" << endl;
+}
+
+void tampilkanSemuaBukuOnline() {
+    cout << "\n--- DAFTAR BUKU ONLINE ---" << endl;
+    cout << "ID Judul Penulis Status Kategori URL/Link" << endl;
+    cout << "----------------------------------------------------------" << endl;
+
+    vector<Buku*> semuaBuku;
+    indeksBuku.getDaftarBuku(semuaBuku);
+    for (Buku* buku : semuaBuku) {
+        if (buku->tipe == TipeBuku::ONLINE) {
+            cout << buku->id << " ";
+            cout << buku->judul << " ";
+            cout << buku->penulis << " ";
+            cout << (buku->dipinjam ? "Dipinjam" : "Tersedia") << " ";
+            cout << kategoriToString(buku->kategori) << " ";
+            cout << buku->tempatBuku << endl;
+
+            if (buku->dipinjam) {
+                int idxPengguna = cariIndeksPenggunaBerdasarkanId(buku->idPenggunaPeminjam);
+                if (idxPengguna != -1) {
+                    cout << "\tPeminjam: " << daftarPengguna[idxPengguna].nama 
+                         << " (ID: " << buku->idPenggunaPeminjam << ")\n";
+                    cout << "\tWaktu Pinjam: " << buku->waktuPinjam.toString() << "\n";
+                    cout << "\tDeadline: " << buku->deadlinePengembalian.toString();
+                    if (buku->deadlinePengembalian.sudahLewatWaktu()) {
+                        cout << " (TERLAMBAT)";
+                    }
+                    cout << "\n";
+                }
+            }
+            cout << endl;
+        }
+    }
+    cout << "----------------------------------------------------------" << endl;
+}
+
+void pinjamBuku(TipeBuku tipe) {
+    int idBuku;
+    cout << "Masukkan ID Buku: ";
+    if (!(cin >> idBuku)) {
+        cout << "Input ID Buku tidak valid." << endl;
+        bersihkanBufferInput();
+        return;
+    }
+    bersihkanBufferInput();
+    
+    Buku* buku = indeksBuku.cariBuku(idBuku);
+    if (buku == nullptr) {
+        cout << "Buku tidak ditemukan." << endl;
+        return;
+    }
+    
+    if (buku->tipe != tipe) {
+        cout << "Buku ini bukan jenis " << (tipe == TipeBuku::FISIK ? "fisik" : "online") << endl;
+        return;
+    }
+    
+    if (buku->dipinjam) {
+        // Check if book is already borrowed by the same user
+        if (buku->idPenggunaPeminjam == penggunaLoginId) {
+            cout << "Anda sudah meminjam buku ini." << endl;
+            return;
+        }
+        
+        // Add to queue
+        int idxPengguna = cariIndeksPenggunaBerdasarkanId(penggunaLoginId);
+        if (idxPengguna != -1) {
+            antrian.enqueue(penggunaLoginId, idBuku, daftarPengguna[idxPengguna].nama, buku->judul);
+        }
+    } else {
+        buku->dipinjam = true;
+        buku->idPenggunaPeminjam = penggunaLoginId;
+        buku->waktuPinjam.setWaktuSekarang();
+        buku->deadlinePengembalian = buku->waktuPinjam;
+        buku->deadlinePengembalian.tambahMinggu();
+        
+        int idxPengguna = cariIndeksPenggunaBerdasarkanId(penggunaLoginId);
+        if (idxPengguna != -1) {
+            riwayat.tambahRiwayat(idBuku, penggunaLoginId, buku->judul, 
+                                daftarPengguna[idxPengguna].nama, 
+                                buku->waktuPinjam,
+                                buku->deadlinePengembalian);
+            
+            cout << "Buku '" << buku->judul << "' berhasil dipinjam oleh " 
+                 << daftarPengguna[idxPengguna].nama << endl;
+            cout << "Harap dikembalikan sebelum: " << buku->deadlinePengembalian.toString() << endl;
+            
+            if (buku->tipe == TipeBuku::ONLINE) {
+                cout << "Link akses buku: " << buku->tempatBuku << endl;
+            }
+        }
+    }
+}
+
+void kembalikanBuku(TipeBuku tipe) {
+    int idBuku;
+    cout << "Masukkan ID Buku yang akan dikembalikan: ";
+    if (!(cin >> idBuku)) {
+        cout << "Input ID Buku tidak valid." << endl;
+        bersihkanBufferInput();
+        return;
+    }
+    bersihkanBufferInput();
+    
+    Buku* buku = indeksBuku.cariBuku(idBuku);
+    if (buku == nullptr) {
+        cout << "Buku tidak ditemukan." << endl;
+        return;
+    }
+    
+    if (buku->tipe != tipe) {
+        cout << "Buku ini bukan jenis " << (tipe == TipeBuku::FISIK ? "fisik" : "online") << endl;
+        return;
+    }
+    
+    if (!buku->dipinjam) {
+        cout << "Buku tidak sedang dipinjam." << endl;
+        return;
+    }
+    
+    if (buku->idPenggunaPeminjam != penggunaLoginId) {
+        cout << "Anda tidak memiliki izin untuk mengembalikan buku ini." << endl;
+        return;
+    }
+    
+    Waktu waktuKembali;
+    waktuKembali.setWaktuSekarang();
+    
+    riwayat.selesaiPeminjaman(idBuku, waktuKembali);
+    
+    cout << "Buku '" << buku->judul << "' berhasil dikembalikan." << endl;
+    
+    // Check for late return
+    if (waktuKembali.sudahLewatWaktu()) {
+        cout << "PERHATIAN: Pengembalian terlambat!" << endl;
+    }
+    
+    buku->dipinjam = false;
+    buku->idPenggunaPeminjam = -1;
+    
+    // Process queue if there are waiting users
+    if (!antrian.kosong()) {
+        prosesAntrian();
+    }
+}
+
+void tampilkanRiwayatPeminjaman(TipeBuku tipe) {
+    vector<Buku*> semuaBuku;
+    indeksBuku.getDaftarBuku(semuaBuku);
+    
+    cout << "\n--- RIWAYAT PEMINJAMAN BUKU " << (tipe == TipeBuku::FISIK ? "FISIK" : "ONLINE") << " ---" << endl;
+    cout << "ID\tJudul\t\tPeminjam\tWaktu Pinjam\t\tDeadline\t\tStatus" << endl;
+    cout << "--------------------------------------------------------------------------------" << endl;
+    
+    bool ditemukan = false;
+    for (Buku* buku : semuaBuku) {
+        if (buku->tipe == tipe) {
+            NodeRiwayat* current = riwayat.getHead();
+            while (current != nullptr) {
+                if (current->idBuku == buku->id) {
+                    ditemukan = true;
+                    cout << buku->id << "\t" 
+                         << (buku->judul.length() > 15 ? 
+                            buku->judul.substr(0, 12) + "..." : buku->judul) << "\t"
+                         << (current->namaPengguna.length() > 10 ? 
+                            current->namaPengguna.substr(0, 7) + "..." : current->namaPengguna) << "\t"
+                         << current->waktuPinjam.toString() << "\t"
+                         << current->deadlinePengembalian.toString() << "\t";
+                    
+                    if (current->waktuKembali.hari != 0) {
+                        cout << "Dikembalikan: " << current->waktuKembali.toString();
+                    } else {
+                        cout << "Masih dipinjam";
+                        if (current->deadlinePengembalian.sudahLewatWaktu()) {
+                            cout << " (TERLAMBAT)";
+                        }
+                    }
+                    cout << endl;
+                }
+                current = current->next;
+            }
+        }
+    }
+    
+    if (!ditemukan) {
+        cout << "Tidak ada riwayat peminjaman untuk buku " << (tipe == TipeBuku::FISIK ? "fisik" : "online") << endl;
+    }
+    cout << "--------------------------------------------------------------------------------" << endl;
+}
+
+void tampilkanSemuaPengguna() {
+    if (jumlahPengguna == 0) {
+        cout << "Belum ada pengguna terdaftar." << endl;
+        return;
+    }
+    
+    cout << "\n--- DAFTAR PENGGUNA ---" << endl;
+    cout << "ID\tNama\t\tUsername" << endl;
+    cout << "----------------------------------------" << endl;
+    
+    for (int i = 0; i < jumlahPengguna; i++) {
+        cout << daftarPengguna[i].idPengguna << "\t" 
+             << (daftarPengguna[i].nama.length() > 15 ? 
+                daftarPengguna[i].nama.substr(0, 12) + "..." : daftarPengguna[i].nama) << "\t"
+             << daftarPengguna[i].username << endl;
+    }
+    cout << "----------------------------------------" << endl;
+}
+
+void prosesAntrian() {
+    if (antrian.kosong()) {
+        cout << "Tidak ada antrian untuk diproses." << endl;
+        return;
+    }
+
+    NodeQueue* antrianDepan = antrian.dequeue();
+    if (antrianDepan == nullptr) {
+        return;
+    }
+
+    Buku* buku = indeksBuku.cariBuku(antrianDepan->idBuku);
+    if (buku == nullptr) {
+        cout << "Buku tidak ditemukan." << endl;
+        delete antrianDepan;
+        return;
+    }
+
+    if (buku->dipinjam) {
+        // Book still borrowed, put back in queue
+        antrian.enqueue(antrianDepan->idPengguna, antrianDepan->idBuku, 
+                       antrianDepan->namaPengguna, antrianDepan->judulBuku);
+        cout << "Buku masih dipinjam. Pengguna " << antrianDepan->namaPengguna 
+             << " dikembalikan ke antrian." << endl;
+    } else {
+        // Book available, process borrowing
+        buku->dipinjam = true;
+        buku->idPenggunaPeminjam = antrianDepan->idPengguna;
+        buku->waktuPinjam.setWaktuSekarang();
+        buku->deadlinePengembalian = buku->waktuPinjam;
+        buku->deadlinePengembalian.tambahMinggu();
+        
+        riwayat.tambahRiwayat(antrianDepan->idBuku, antrianDepan->idPengguna, 
+                             buku->judul, antrianDepan->namaPengguna, 
+                             buku->waktuPinjam, buku->deadlinePengembalian);
+        
+        cout << "Buku '" << buku->judul << "' berhasil dipinjam oleh " 
+             << antrianDepan->namaPengguna << " dari antrian." << endl;
+        cout << "Harap dikembalikan sebelum: " << buku->deadlinePengembalian.toString() << endl;
+    }
+
+    delete antrianDepan;
+}
+
+void urutkanBuku() {
+    // Using Selection Sort for stability
+    for (int i = 0; i < jumlahBuku - 1; i++) {
+        int minIdx = i;
+        for (int j = i + 1; j < jumlahBuku; j++) {
+            if (daftarBuku[j].judul < daftarBuku[minIdx].judul) {
+                minIdx = j;
+            }
+        }
+        if (minIdx != i) {
+            swap(daftarBuku[i], daftarBuku[minIdx]);
+        }
+    }
+    
+    // Rebuild BST after sorting
+    indeksBuku.clear();
+    for (int i = 0; i < jumlahBuku; i++) {
+        indeksBuku.tambahBuku(&daftarBuku[i]);
+    }
+    
+    cout << "Buku berhasil diurutkan berdasarkan judul secara alfabetis." << endl;
+}
+
+void cariBuku(TipeBuku tipe) {
+    string keyword;
+    cout << "Masukkan kata kunci pencarian (judul): ";
+    getline(cin, keyword);
+    
+    if (keyword.empty()) {
+        cout << "Kata kunci tidak boleh kosong." << endl;
+        return;
+    }
+    
+    // Convert to lowercase safely
+    transform(keyword.begin(), keyword.end(), keyword.begin(), 
+              [](unsigned char c) { return tolower(c); });
+    
+    cout << "\n--- HASIL PENCARIAN BUKU " << (tipe == TipeBuku::FISIK ? "FISIK" : "ONLINE") << " ---" << endl;
+    bool ditemukan = false;
+    
+    vector<Buku*> semuaBuku;
+    indeksBuku.getDaftarBuku(semuaBuku);
+    for (Buku* buku : semuaBuku) {
+        if (buku->tipe == tipe) {
+            string judulLower = buku->judul;
+            // Convert to lowercase safely
+            transform(judulLower.begin(), judulLower.end(), judulLower.begin(),
+                      [](unsigned char c) { return tolower(c); });
+            
+            if (judulLower.find(keyword) != string::npos) {
+                ditemukan = true;
+                cout << "ID: " << buku->id << endl;
+                cout << "Judul: " << buku->judul << endl;
+                cout << "Penulis: " << buku->penulis << endl;
+                cout << "Kategori: " << kategoriToString(buku->kategori) << endl;
+                cout << "Tipe: " << tipeToString(buku->tipe) << endl;
+                cout << "Status: " << (buku->dipinjam ? "Dipinjam" : "Tersedia") << endl;
+                
+                if (buku->tipe == TipeBuku::FISIK) {
+                    cout << "Lokasi: " << buku->tempatBuku << endl;
+                } else {
+                    cout << "URL: " << buku->tempatBuku << endl;
+                }
+                
+                if (buku->dipinjam) {
+                    int idxPengguna = cariIndeksPenggunaBerdasarkanId(buku->idPenggunaPeminjam);
+                    if (idxPengguna != -1) {
+                        cout << "Peminjam: " << daftarPengguna[idxPengguna].nama 
+                             << " (ID: " << buku->idPenggunaPeminjam << ")" << endl;
+                        cout << "Waktu Pinjam: " << buku->waktuPinjam.toString() << endl;
+                        cout << "Deadline: " << buku->deadlinePengembalian.toString();
+                        if (buku->deadlinePengembalian.sudahLewatWaktu()) {
+                            cout << " (TERLAMBAT)";
+                        }
+                        cout << endl;
+                    }
+                }
+                cout << "----------------------------------------" << endl;
+            }
+        }
+    }
+    
+    if (!ditemukan) {
+        cout << "Tidak ada buku " << (tipe == TipeBuku::FISIK ? "fisik" : "online") 
+             << " yang ditemukan dengan kata kunci '" << keyword << "'." << endl;
+    }
+    cout << "----------------------" << endl;
+}
+
+int cariIndeksPenggunaBerdasarkanId(int idPengguna) {
+    for (int i = 0; i < jumlahPengguna; i++) {
+        if (daftarPengguna[i].idPengguna == idPengguna) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void bersihkanBufferInput() {
+    cin.clear();
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+}
+
+string kategoriToString(KategoriBuku kategori) {
+    switch (kategori) {
+        case KategoriBuku::EKONOMI: return "Ekonomi";
+        case KategoriBuku::ILMU_KOMPUTER: return "Ilmu Komputer";
+        case KategoriBuku::AGAMA: return "Agama";
+        case KategoriBuku::SOSIAL: return "Sosial";
+        case KategoriBuku::PEMERINTAHAN: return "Pemerintahan";
+        case KategoriBuku::FILSAFAT: return "Filsafat";
+        case KategoriBuku::LAIN_LAIN: return "Lain-lain";
+        default: return "Tidak Diketahui";
+    }
+}
+
+string tipeToString(TipeBuku tipe) {
+    return (tipe == TipeBuku::FISIK) ? "Fisik" : "Online";
+}
+
+// Main Function
+int main() {
+    initializePengguna();
+    initializeBuku();
+    
+    int pilihan;
+    do {
+        if (penggunaLoginId == -1) {
+            // Login menu
+            tampilkanMenuLogin();
+            cout << "Pilih menu: ";
+            if (!(cin >> pilihan)) {
+                cout << "Input tidak valid. Harap masukkan angka." << endl;
+                bersihkanBufferInput();
+                continue;
+            }
+            bersihkanBufferInput();
+            
+            switch (pilihan) {
+                case 1: login(); break;
+                case 2: daftarAkun(); break;
+                case 0: cout << "Terima kasih telah menggunakan sistem perpustakaan!" << endl; break;
+                default: cout << "Pilihan tidak valid." << endl;
+            }
+        } else {
+            // Main menu
+            tampilkanMenuUtama();
+            cout << "Pilih menu: ";
+            if (!(cin >> pilihan)) {
+                cout << "Input tidak valid. Harap masukkan angka." << endl;
+                bersihkanBufferInput();
+                continue;
+            }
+            bersihkanBufferInput();
+            
+            if (pilihan == 1) {
+                // Physical books menu
+                int pilihanFisik;
+                do {
+                    tampilkanMenuBukuFisik();
+                    cout << "Pilih menu: ";
+                    if (!(cin >> pilihanFisik)) {
+                        cout << "Input tidak valid. Harap masukkan angka." << endl;
+                        bersihkanBufferInput();
+                        continue;
+                    }
+                    bersihkanBufferInput();
+                    
+                    switch (pilihanFisik) {
+                        case 1: tampilkanSemuaBukuFisik(); break;
+                        case 2: pinjamBuku(TipeBuku::FISIK); break;
+                        case 3: kembalikanBuku(TipeBuku::FISIK); break;
+                        case 4: tampilkanRiwayatPeminjaman(TipeBuku::FISIK); break;
+                        case 5: cariBuku(TipeBuku::FISIK); break;
+                        case 0: break;
+                        default: cout << "Pilihan tidak valid." << endl;
+                    }
+                    
+                    if (pilihanFisik != 0) {
+                        cout << "\nTekan Enter untuk melanjutkan...";
+                        cin.get();
+                    }
+                } while (pilihanFisik != 0);
+            } 
+            else if (pilihan == 2) {
+                // Online books menu
+                int pilihanOnline;
+                do {
+                    tampilkanMenuBukuOnline();
+                    cout << "Pilih menu: ";
+                    if (!(cin >> pilihanOnline)) {
+                        cout << "Input tidak valid. Harap masukkan angka." << endl;
+                        bersihkanBufferInput();
+                        continue;
+                    }
+                    bersihkanBufferInput();
+                    
+                    switch (pilihanOnline) {
+                        case 1: tampilkanSemuaBukuOnline(); break;
+                        case 2: pinjamBuku(TipeBuku::ONLINE); break;
+                        case 3: kembalikanBuku(TipeBuku::ONLINE); break;
+                        case 4: tampilkanRiwayatPeminjaman(TipeBuku::ONLINE); break;
+                        case 5: cariBuku(TipeBuku::ONLINE); break;
+                        case 0: break;
+                        default: cout << "Pilihan tidak valid." << endl;
+                    }
+                    
+                    if (pilihanOnline != 0) {
+                        cout << "\nTekan Enter untuk melanjutkan...";
+                        cin.get();
+                    }
+                } while (pilihanOnline != 0);
+            }
+            else if (pilihan == 3) {
+                // Show user's borrowing history
+                riwayat.tampilkanRiwayatPengguna(penggunaLoginId);
+                cout << "\nTekan Enter untuk melanjutkan...";
+                cin.get();
+            }
+            else if (pilihan == 0) {
+                cout << "Logout berhasil. Sampai jumpa, " 
+                     << daftarPengguna[cariIndeksPenggunaBerdasarkanId(penggunaLoginId)].nama << "!" << endl;
+                penggunaLoginId = -1;
+            }
+            else {
+                cout << "Pilihan tidak valid." << endl;
+            }
+        }
+        
+        if (pilihan != 0 || penggunaLoginId != -1) {
+            cout << "\nTekan Enter untuk melanjutkan...";
+            cin.get();
+        }
+        
+    } while (pilihan != 0 || penggunaLoginId != -1);
+    
+    return 0;
+}
